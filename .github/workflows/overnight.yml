@@ -24,8 +24,11 @@ jobs:
 
       - name: Run batch scraper
         env:
-          SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          SERPER_API_KEY_1: ${{ secrets.SERPER_API_KEY_1 }}
+          SERPER_API_KEY_2: ${{ secrets.SERPER_API_KEY_2 }}
+          GROQ_API_KEY_1: ${{ secrets.GROQ_API_KEY_1 }}
+          GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
+          GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
         run: python batch_run.py
 
       - name: Commit reports
