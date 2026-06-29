@@ -4,6 +4,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+def _get_groq_keys() -> list:
+    keys = []
+    for i in range(1, 10):
+        k = os.getenv(f"GROQ_API_KEY_{i}")
+        if k:
+            keys.append(k)
+    if not keys:
+        k = os.getenv("GROQ_API_KEY")
+        if k:
+            keys.append(k)
+    return keys
+
 def format_posts_for_claude(posts: list) -> str:
     """Convert scraped posts into a clean text block for the LLM."""
     formatted = []
@@ -30,7 +42,9 @@ def analyze_pain_points(posts: list, subreddit: str, context: str = "") -> str:
     Send posts to Claude and get back a structured pain point analysis.
     Returns markdown report as string.
     """
-    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    groq_keys = _get_groq_keys()
+    if not groq_keys:
+        raise RuntimeError("No GROQ_API_KEY found in .env")
 
     # Groq free tier: 12000 TPM — cap at 80 posts (~300 chars each stays safe)
     if len(posts) > 80:
@@ -88,15 +102,22 @@ Which pain point is most frequent, most severe, and least served by existing too
 
 Be specific. Use real quotes from the posts. Don't generalize."""
 
-    message = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        max_tokens=4000,
-        messages=[
-            {"role": "user", "content": prompt}
-        ]
-    )
+    for i, key in enumerate(groq_keys):
+        try:
+            client = Groq(api_key=key)
+            message = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                max_tokens=4000,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            return message.choices[0].message.content
+        except Exception as e:
+            if "rate_limit" in str(e).lower() or "413" in str(e) or "429" in str(e):
+                print(f"  [groq] key {i+1} rate limited, rotating...")
+                continue
+            raise
 
-    return message.choices[0].message.content
+    raise RuntimeError("All Groq API keys exhausted / rate limited")
 
 
 def save_report(report: str, platform: str, target: str = "") -> str:

@@ -87,17 +87,40 @@ PLATFORMS = {
 }
 
 
+def _get_serper_keys() -> list:
+    keys = []
+    for i in range(1, 10):
+        k = os.getenv(f"SERPER_API_KEY_{i}")
+        if k:
+            keys.append(k)
+    if not keys:
+        k = os.getenv("SERPER_API_KEY")
+        if k:
+            keys.append(k)
+    return keys
+
+
+_serper_key_index = 0
+
 def _search(query: str, retries: int = 3) -> list:
-    headers = {
-        "X-API-KEY": os.getenv("SERPER_API_KEY"),
-        "Content-Type": "application/json",
-    }
+    global _serper_key_index
+    keys = _get_serper_keys()
+    if not keys:
+        raise RuntimeError("No SERPER_API_KEY found in .env")
+
     for attempt in range(retries):
+        key = keys[_serper_key_index % len(keys)]
+        headers = {"X-API-KEY": key, "Content-Type": "application/json"}
         try:
             resp = requests.post(SERPER_ENDPOINT, headers=headers, json={"q": query, "num": 20}, timeout=15)
+            if resp.status_code == 429 or (not resp.ok and "limit" in resp.text.lower()):
+                print(f"  [serper] key {_serper_key_index % len(keys) + 1} rate limited, rotating...")
+                _serper_key_index += 1
+                time.sleep(2)
+                continue
             if not resp.ok:
                 raise RuntimeError(f"Serper {resp.status_code}: {resp.text[:300]}")
-            time.sleep(1.2)  # stay under free tier rate limit
+            time.sleep(1.2)
             return resp.json().get("organic", [])
         except (requests.exceptions.SSLError, requests.exceptions.ConnectionError) as e:
             if attempt < retries - 1:
