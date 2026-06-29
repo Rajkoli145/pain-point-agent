@@ -1,0 +1,37 @@
+name: Overnight Pain Point Scraper
+
+on:
+  schedule:
+    - cron: "30 18 * * *"  # 12:00 AM IST (18:30 UTC)
+  workflow_dispatch:         # manual trigger from GitHub UI
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run batch scraper
+        env:
+          SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: python batch_run.py
+
+      - name: Commit reports
+        run: |
+          git config user.name "overnight-bot"
+          git config user.email "bot@overnight"
+          git add output/
+          git diff --staged --quiet || git commit -m "overnight batch $(date +'%Y-%m-%d')"
+          git push
