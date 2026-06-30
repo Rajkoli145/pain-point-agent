@@ -5,6 +5,9 @@ on:
     - cron: "30 18 * * *"  # 12:00 AM IST (18:30 UTC)
   workflow_dispatch:         # manual trigger from GitHub UI
 
+permissions:
+  contents: write
+
 jobs:
   scrape:
     runs-on: ubuntu-latest
